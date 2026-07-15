@@ -1,0 +1,331 @@
+--- MODUL 1 PRACTICE 2 PART 3 ---
+
+выполнял на своем терминале ноутбука
+
+git config --global user.name maxxanz
+
+git config --global user.email maxisgrsnk@gmail.com
+
+git config --global init.defaultBranch main
+
+git config --list
+
+user.name=maxxanz
+user.email=maxisgrsnk@gmail.com
+init.defaultbranch=main
+
+
+
+apt update
+
+apt install git gh
+
+git --version
+
+git version 2.53.0
+
+gh --version
+
+gh version 2.46.0 (2025-12-13 Ubuntu 2.46.0-4)
+https://github.com/cli/cli/releases/tag/v2.46.0
+
+
+
+
+ssh-keygen -t ed25519 -f ~/.ssh/maxxanzGIT
+Generating public/private ed25519 key pair.
+Enter passphrase for "/home/xanz/.ssh/maxxanzGIT" (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/xanz/.ssh/maxxanzGIT
+Your public key has been saved in /home/xanz/.ssh/maxxanzGIT.pub
+The key fingerprint is:
+SHA256:3tAJljj6CB8LMAVBQrgDBTCQ8bX9CeCn2Oibqo1c0po xanz@xanz
+The key's randomart image is:
++--[ED25519 256]--+
+|/Xo o            |
+|=+ o + . .       |
+|+.. o * +        |
+|oo + + = + .     |
+| .= =   S o      |
+| ..+ = . o       |
+| ..o+ . . .      |
+|.o=o             |
+|=E+              |
++----[SHA256]-----+
+
+
+
+
+gh auth login
+
+What account do you want to log into? GitHub.com
+? What is your preferred protocol for Git operations on this host? SSH
+? Upload your SSH public key to your GitHub account? /home/xanz/.ssh/maxxanzGIT.pub
+? Title for your SSH key: eltex-practice-pgX-v14
+? How would you like to authenticate GitHub CLI? Login with a web browser
+
+! First copy your one-time code: **
+Press Enter to open github.com in your browser... 
+Gtk-Message: 14:11:42.082: Not loading module "atk-bridge": The functionality is provided by GTK natively. Please try to not load it.
+
+✓ Authentication complete.
+- gh config set -h github.com git_protocol ssh
+✓ Configured git protocol
+✓ Uploaded the SSH key to your GitHub account: /home/xanz/.ssh/maxxanzGIT.pub
+✓ Logged in as maxxanz
+
+
+
+gh auth setup-git --hostname github.com
+
+gh auth status
+
+github.com
+  ✓ Logged in to github.com account maxxanz (keyring)
+  - Active account: true
+  - Git operations protocol: ssh
+  - Token: gho_************************************
+  - Token scopes: 'admin:public_key', 'gist', 'read:org', 'repo'
+
+
+
+gh repo create --public eltex_practice2026
+
+✓ Created repository maxxanz/eltex_practice2026 on GitHub
+  https://github.com/maxxanz/eltex_practice2026
+
+
+
+
+
+mkdir ~/modul1 && cd ~/modul1
+
+echo "# first repo from terminal" >> README.md
+
+git init
+
+Initialized empty Git repository in /home/xanz/modul1/.git/
+
+git add README.md 
+
+git commit -m "first commit add Readme and create start"
+
+[main (root-commit) 68eeacc] first commit add Readme and create start
+ 1 file changed, 1 insertion(+)
+ create mode 100644 README.md
+
+git branch -M main
+
+git remote add origin https://github.com/maxxanz/eltex_practice2026.git
+
+git status
+
+On branch main
+nothing to commit, working tree clean
+
+git push -u origin main
+
+The authenticity of host 'github.com (140.82.121.4)' can't be established.
+ED25519 key fingerprint is: SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'github.com' (ED25519) to the list of known hosts.
+Enumerating objects: 3, done.
+Counting objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 256 bytes | 256.00 KiB/s, done.
+Total 3 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:maxxanz/eltex_practice2026.git
+ * [new branch]      main -> main
+branch 'main' set up to track 'origin/main'.
+
+mkdir -p modul1/task1
+mkdir modul1/task2
+mkdir modul1/task3
+
+
+scp -P 44556 eltex-v14@217.71.138.1:~/eltex-v14_part.log /home/xanz/modul1/task2/
+
+git add .
+
+git status
+
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   eltex-v14_part.log
+
+git commit -m "add modul1 prac1 task2"
+
+[main 045723f] add modul1 prac1 task2
+ 1 file changed, 255 insertions(+)
+ create mode 100644 task2/eltex-v14_part.log
+
+git push
+
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (4/4), 1.76 KiB | 1.76 MiB/s, done.
+Total 4 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:maxxanz/eltex_practice2026.git
+   68eeacc..045723f  main -> main
+
+scp -P 44556 eltex-v14@217.71.138.1:~/eltex-v14_part3.log /home/xanz/modul1/task3/
+
+eltex-v14@217.71.138.1's password: 
+eltex-v14_part3.log                                                             100% 9563    18.1KB/s   00:00    
+ 
+git add .
+
+git status
+
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   eltex-v14_part3.log
+
+git commit -m "add modul1 prac1 task3"
+
+[main 962fd27] add modul1 prac1 task3
+ 1 file changed, 163 insertions(+)
+ create mode 100644 task3/eltex-v14_part3.log
+
+git push
+
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (4/4), 2.09 KiB | 2.09 MiB/s, done.
+Total 4 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:maxxanz/eltex_practice2026.git
+   045723f..962fd27  main -> main
+
+cp /home/xanz/Desktop/modul1_prac1/1\(1-1\)grishchenko.odt /home/xanz/modul1/task1/
+
+git add .
+
+git commit -m "add modul1 prac1 task1"
+
+git push
+
+
+
+
+mkdir ~/eltex_practice2026_clone %% cd ~/eltex_practice2026_clone
+
+git clone https://github.com/maxxanz/eltex_practice2026.git .
+Cloning into '.'...
+remote: Enumerating objects: 15, done.
+remote: Counting objects: 100% (15/15), done.
+remote: Compressing objects: 100% (10/10), done.
+remote: Total 15 (delta 2), reused 13 (delta 0), pack-reused 0 (from 0)
+Receiving objects: 100% (15/15), 301.56 KiB | 196.00 KiB/s, done.
+Resolving deltas: 100% (2/2), done.
+
+
+
+
+echo "change for main file" >> README.md 
+
+git status
+
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   README.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+git add .
+
+git commit -m "add change for main file readme"
+
+[main 624dfe5] add change for main file readme
+ 1 file changed, 1 insertion(+)
+
+git push
+
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 12 threads
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 382 bytes | 382.00 KiB/s, done.
+Total 3 (delta 0), reused 0 (delta 0), pack-reused 0 (from 0)
+To github.com:maxxanz/eltex_practice2026.git
+   a59d87a..624dfe5  main -> main
+
+
+
+
+
+
+cd ~/eltex_practice2026_clone/
+
+git fetch
+
+remote: Enumerating objects: 5, done.
+remote: Counting objects: 100% (5/5), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 3 (delta 0), reused 3 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 362 bytes | 362.00 KiB/s, done.
+From https://github.com/maxxanz/eltex_practice2026
+   a59d87a..624dfe5  main       -> origin/main
+
+git log origin/main
+
+commit 624dfe515407df6bccc191a765683cb470bb7efc (origin/main, origin/HEAD)
+Author: maxxanz <maxisgrsnk@gmail.com>
+Date:   Tue Jul 14 18:05:02 2026 +0700
+
+    add change for main file readme
+
+commit a59d87a511b8b8f329f33c1ffdb35fea438f387e (HEAD -> main)
+Author: maxxanz <maxisgrsnk@gmail.com>
+Date:   Tue Jul 14 17:18:01 2026 +0700
+
+    add modul1 prac1 task3
+
+commit 962fd27d00cf8e8c422d0f631050461dd714d299
+Author: maxxanz <maxisgrsnk@gmail.com>
+Date:   Tue Jul 14 17:08:15 2026 +0700
+
+    add modul1 prac1 task3
+
+commit 045723fa9d4df84d6b5e751d62320efa619bbbf8
+Author: maxxanz <maxisgrsnk@gmail.com>
+Date:   Tue Jul 14 17:05:30 2026 +0700
+
+    add modul1 prac1 task2
+
+commit 68eeacceafa9a81d014f8796c3854b5793b91c67
+Author: maxxanz <maxisgrsnk@gmail.com>
+Date:   Tue Jul 14 14:24:31 2026 +0700
+
+    first commit add Readme and create start
+
+git diff main origin/main 
+
+diff --git a/README.md b/README.md
+index 9a19184..3fb8388 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,2 @@
+ # first repo from terminal
++change for main file
+
+git pull
+
+Updating a59d87a..624dfe5
+Fast-forward
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+
