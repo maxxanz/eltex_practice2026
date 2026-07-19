@@ -1,0 +1,562 @@
+Vim cuckoo.sh
+
+
+
+#!/bin/bash
+
+# --- Настройки ---
+PIPE_DIR="/tmp/run"          # Папка для канала
+PIPE_NAME="cuckoo.pid"       # Имя файла канала
+PIPE_PATH="$PIPE_DIR/$PIPE_NAME"
+LOG_FILE="cuckoo.log"        # Файл для логов
+
+# --- 1. Создаем папку и именованный канал (если их нет) ---
+mkdir -p "$PIPE_DIR"
+# Удаляем старый канал, если он есть, чтобы не было ошибок
+rm -f "$PIPE_PATH"
+mkfifo "$PIPE_PATH"
+
+# --- 2. Записываем в лог сообщение о запуске ---
+echo "$(date '+%Y-%m-%d %H:%M:%S') Startup!" >> "$LOG_FILE"
+
+# --- 3. Функция, которая будет выполняться при получении сигнала ---
+shutdown() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') Shutdown!" >> "$LOG_FILE"
+    rm -f "$PIPE_PATH"  # Удаляем канал
+    exit 0
+}
+
+# Ловим сигнал SIGUSR1 и вызываем функцию shutdown
+trap shutdown SIGUSR1
+
+# --- 4. Основной цикл: читаем запросы из канала ---
+while true; do
+    # Читаем одну строку из канала.
+    # ВАЖНО: используем redirect на уровне цикла, а не на уровне read!
+    if read -r request; then
+        # Из запроса вида "bash[1234]: how much time do I have?"
+        # нам нужно извлечь имя процесса и его PID.
+        if [[ "$request" =~ ^([^\[]+)\[([0-9]+)\]: ]]; then
+            NAME="${BASH_REMATCH[1]}"
+            PID="${BASH_REMATCH[2]}"
+        else
+            # Если формат не распознан, пропускаем
+            echo "Ошибка формата: $request" >> "$LOG_FILE"
+            continue
+        fi
+
+        # Генерируем случайное число N от 2 до 10
+        N=$(( (RANDOM % 9) + 2 ))
+
+        # Отправляем ответ обратно в канал
+        # ВАЖНО: просто echo (без перенаправления), потому что вывод идет в канал
+        echo "$N"
+
+        # Записываем событие в лог
+        echo "$(date '+%Y-%m-%d %H:%M:%S') ${NAME}[${PID}] ${N}" >> "$LOG_FILE"
+    fi
+done < "$PIPE_PATH"   # <--- ВОТ ЗДЕСЬ! Весь цикл читает из канала
+
+
+
+
+chmod +x cuckoo.sh 
+nohup ./cuckoo.sh & 
+[1] 348101
+nohup: ignoring input and appending output to 'nohup.out'
+
+ps aux | grep cuckoo.sh 
+
+eltex-v+  348101  0.0  0.0   6944  3328 pts/50   S    18:23   0:00 /bin/bash ./cuckoo.sh 
+eltex-v+  348107  0.0  0.0   6476  2228 pts/50   S+   18:23   0:00 grep cuckoo.sh
+
+
+
+
+
+
+
+
+
+vim template_task.sh
+
+
+
+
+#!/bin/bash
+
+# Получаем имя скрипта без пути (например, template_task.sh или task1.sh)
+SCRIPT_NAME=$(basename "$0")
+
+# --- Проверка: если имя шаблонное, выходим ---
+if [ "$SCRIPT_NAME" == "template_task.sh" ]; then
+    echo "я бригадир, сам не работаю"
+    exit 1
+fi
+
+# --- Настройки для общения с cuckoo ---
+PIPE_DIR="/tmp/run"
+PIPE_NAME="cuckoo.pid"
+PIPE_PATH="$PIPE_DIR/$PIPE_NAME"
+
+# --- 1. Пишем в лог о запуске ---
+LOG_FILE="report_${SCRIPT_NAME%.*}.log"  # Имя лога: report_<имя_скрипта>.log
+echo "$(date '+%Y-%m-%d %H:%M:%S') [$$] Скрипт запущен" >> "$LOG_FILE"
+
+# --- 2. Запрашиваем время у cuckoo ---
+# Формируем сообщение: ИМЯ_ПРОЦЕССА[PID]: how much time do I have?
+REQUEST="${SCRIPT_NAME}[$$]: how much time do I have?"
+
+# Отправляем запрос в канал
+echo "$REQUEST" > "$PIPE_PATH"
+
+# Ждем ответ из канала (читаем одну строку)
+read N < "$PIPE_PATH"
+
+# --- 3. Ждем N секунд ---
+sleep "$N"
+
+# --- 4. Пишем в лог о завершении ---
+echo "$(date '+%Y-%m-%d %H:%M:%S') [$$] Скрипт завершился, работал $N секунд." >> "$LOG_FILE"
+
+
+
+
+chmod +x template_task.sh
+
+vim observer.sh
+
+
+
+
+#!/bin/bash
+
+CONFIG_FILE="observer.conf"
+LOG_FILE="observer.log"
+
+# Проверяем, существует ли файл конфигурации
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Файл конфигурации $CONFIG_FILE не найден!" >> "$LOG_FILE"
+    exit 1
+fi
+
+# Читаем файл конфигурации построчно
+while IFS= read -r SCRIPT_PATH; do
+    # Пропускаем пустые строки
+    if [ -z "$SCRIPT_PATH" ]; then
+        continue
+    fi
+
+    # Имя скрипта без пути (для поиска в /proc)
+    SCRIPT_NAME=$(basename "$SCRIPT_PATH")
+
+    # Проверяем, запущен ли этот скрипт.
+    # Ищем в /proc/*/cmdline, чтобы найти процессы с нашим скриптом.
+    # Используем grep -F для точного поиска строки.
+    if pgrep -f "$SCRIPT_NAME" > /dev/null; then
+        # Процесс запущен, ничего не делаем
+        continue
+    else
+        # Процесс не запущен, запускаем его через nohup
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Запуск: $SCRIPT_PATH" >> "$LOG_FILE"
+        # Запускаем в фоне с nohup, чтобы не зависеть от терминала
+        nohup "$SCRIPT_PATH" > /dev/null 2>&1 &
+    fi
+done < "$CONFIG_FILE"
+
+
+
+chmod +x observer.sh
+
+
+
+vim observer.conf
+
+./task1.sh
+./task2.sh
+./task3.sh
+
+
+
+ln -s template_task.sh task1.sh
+ln -s template_task.sh task2.sh
+ln -s template_task.sh task3.sh
+
+ls -l *.sh
+
+-rwxr-xr-x 1 eltex-v14 eltex-v14 2504 Jul 19 18:22 cuckoo.sh
+-rwxr-xr-x 1 eltex-v14 eltex-v14 1389 Jul 19 18:30 observer.sh
+lrwxrwxrwx 1 eltex-v14 eltex-v14   16 Jul 19 18:31 task1.sh -> template_task.sh
+lrwxrwxrwx 1 eltex-v14 eltex-v14   16 Jul 19 18:31 task2.sh -> template_task.sh
+lrwxrwxrwx 1 eltex-v14 eltex-v14   16 Jul 19 18:31 task3.sh -> template_task.sh
+-rwxr-xr-x 1 eltex-v14 eltex-v14 1347 Jul 19 18:28 template_task.sh
+
+
+
+crontab -e
+
+* * * * * cd /home/eltex-v14 && ./observer.sh
+
+
+
+
+nohup ./cuckoo.sh > /dev/null 2>&1 &
+
+ps aux | grep cuckoo.sh
+
+ls -la /tmp/run/cuckoo.pid
+
+[5] 353303
+eltex-v+  353303  0.0  0.0   6944  3204 pts/50   S    19:12   0:00 /bin/bash ./cuckoo.sh
+eltex-v+  353305  0.0  0.0   6476  2172 pts/50   S+   19:12   0:00 grep cuckoo.sh
+prw-r--r-- 1 eltex-v14 eltex-v14 0 Jul 19 19:12 /tmp/run/cuckoo.pid
+
+
+
+./task1.sh
+
+cat cuckoo.log
+cat report_task1.log
+
+2026-07-19 19:12:48 Startup!
+2026-07-19 19:12:55 task1.sh[353348] 3
+2026-07-19 19:12:55 [353348] Скрипт запущен
+2026-07-19 19:12:58 [353348] Скрипт завершился, работал 3 секунд.
+
+
+./observer.sh
+
+cat observer.log
+
+ps aux | grep -E "task[1-3]"
+
+2026-07-19 19:13:18 Запуск: /home/eltex-v14/./task1.sh
+2026-07-19 19:13:19 Запуск: /home/eltex-v14/./task2.sh
+2026-07-19 19:13:20 Запуск: /home/eltex-v14/./task3.sh
+
+eltex-v+  353528  0.0  0.0   6944  3488 pts/50   S    19:13   0:00 /bin/bash /home/eltex-v14/./task2.sh
+eltex-v+  353545  0.0  0.0   6944  3464 pts/50   S    19:13   0:00 /bin/bash /home/eltex-v14/./task3.sh
+
+
+
+echo "=== cuckoo.log ==="
+cat cuckoo.log
+echo
+
+echo "=== observer.log ==="
+cat observer.log
+echo
+
+echo "=== report_task1.log ==="
+cat report_task1.log
+echo
+
+echo "=== report_task2.log ==="
+cat report_task2.log
+echo
+
+echo "=== report_task3.log ==="
+cat report_task3.log
+echo
+
+=== cuckoo.log ===
+2026-07-19 19:12:48 Startup!
+2026-07-19 19:12:55 task1.sh[353348] 3
+2026-07-19 19:13:18 task1.sh[353512] 2
+2026-07-19 19:13:19 task2.sh[353528] 7
+2026-07-19 19:13:20 task3.sh[353545] 8
+
+=== observer.log ===
+2026-07-19 19:13:18 Запуск: /home/eltex-v14/./task1.sh
+2026-07-19 19:13:19 Запуск: /home/eltex-v14/./task2.sh
+2026-07-19 19:13:20 Запуск: /home/eltex-v14/./task3.sh
+
+=== report_task1.log ===
+2026-07-19 19:12:55 [353348] Скрипт запущен
+2026-07-19 19:12:58 [353348] Скрипт завершился, работал 3 секунд.
+2026-07-19 19:13:18 [353512] Скрипт запущен
+2026-07-19 19:13:20 [353512] Скрипт завершился, работал 2 секунд.
+
+=== report_task2.log ===
+2026-07-19 19:13:19 [353528] Скрипт запущен
+2026-07-19 19:13:26 [353528] Скрипт завершился, работал 7 секунд.
+
+=== report_task3.log ===
+2026-07-19 19:13:20 [353545] Скрипт запущен
+2026-07-19 19:13:28 [353545] Скрипт завершился, работал 8 секунд.
+
+
+ps aux | grep cuckoo.sh | grep -v grep
+
+kill -SIGUSR1 353303
+
+ps aux | grep cuckoo.sh | grep -v grep
+
+cat cuckoo.log
+
+2026-07-19 19:12:48 Startup!
+2026-07-19 19:12:55 task1.sh[353348] 3
+2026-07-19 19:13:18 task1.sh[353512] 2
+2026-07-19 19:13:19 task2.sh[353528] 7
+2026-07-19 19:13:20 task3.sh[353545] 8
+2026-07-19 19:16:25 Shutdown!
+
+
+
+ps aux | grep -E "(cuckoo|task|observer).sh" | grep -v grep
+
+pkill -f "cuckoo.sh"
+pkill -f "task[1-3].sh"
+pkill -f "observer.sh"
+
+ps aux | grep -E "(cuckoo|task|observer).sh" | grep -v grep
+
+
+
+tar -czf task3_part2.tar.gz \
+    cuckoo.log \
+    observer.log \
+    report_task1.log \
+    report_task2.log \
+    report_task3.log \
+    cuckoo.sh \
+    template_task.sh \
+    observer.sh \
+    observer.conf \
+    task1.sh \
+    task2.sh \
+    task3.sh
+
+
+echo "=== Файлы в архиве ==="
+tar -tzf task3_part2.tar.gz
+
+echo
+echo "=== Размер архива ==="
+ls -lh task3_part2.tar.gz
+
+=== Файлы в архиве ===
+cuckoo.log
+observer.log
+report_task1.log
+report_task2.log
+report_task3.log
+cuckoo.sh
+template_task.sh
+observer.sh
+observer.conf
+task1.sh
+task2.sh
+task3.sh
+
+=== Размер архива ===
+-rw-r--r-- 1 eltex-v14 eltex-v14 2.4K Jul 19 19:18 task3_part2.tar.gz
+
+
+
+echo "--- cuckoo.log ---"
+tar -xzf task3_part2.tar.gz --to-stdout cuckoo.log
+echo
+echo "--- observer.log ---"
+tar -xzf task3_part2.tar.gz --to-stdout observer.log
+echo
+echo "--- report_task1.log ---"
+tar -xzf task3_part2.tar.gz --to-stdout report_task1.log
+echo
+echo "--- report_task2.log ---"
+tar -xzf task3_part2.tar.gz --to-stdout report_task2.log
+echo
+echo "--- report_task3.log ---"
+tar -xzf task3_part2.tar.gz --to-stdout report_task3.log
+
+--- cuckoo.log ---
+2026-07-19 19:12:48 Startup!
+2026-07-19 19:12:55 task1.sh[353348] 3
+2026-07-19 19:13:18 task1.sh[353512] 2
+2026-07-19 19:13:19 task2.sh[353528] 7
+2026-07-19 19:13:20 task3.sh[353545] 8
+2026-07-19 19:16:25 Shutdown!
+
+--- observer.log ---
+2026-07-19 19:13:18 Запуск: /home/eltex-v14/./task1.sh
+2026-07-19 19:13:19 Запуск: /home/eltex-v14/./task2.sh
+2026-07-19 19:13:20 Запуск: /home/eltex-v14/./task3.sh
+
+--- report_task1.log ---
+2026-07-19 19:12:55 [353348] Скрипт запущен
+2026-07-19 19:12:58 [353348] Скрипт завершился, работал 3 секунд.
+2026-07-19 19:13:18 [353512] Скрипт запущен
+2026-07-19 19:13:20 [353512] Скрипт завершился, работал 2 секунд.
+
+--- report_task2.log ---
+2026-07-19 19:13:19 [353528] Скрипт запущен
+2026-07-19 19:13:26 [353528] Скрипт завершился, работал 7 секунд.
+
+--- report_task3.log ---
+2026-07-19 19:13:20 [353545] Скрипт запущен
+2026-07-19 19:13:28 [353545] Скрипт завершился, работал 8 секунд.
+
+
+
+rm -f cuckoo.log observer.log report_*.log
+rm -f /tmp/run/cuckoo.pid
+rm -f nohup.out
+
+
+echo "=== Остались файлы ==="
+ls -la | grep -E "\.(sh|conf|log|tar\.gz|txt)$" | grep -v "^d"
+
+=== Остались файлы ===
+-rwxr-xr-x  1 eltex-v14 eltex-v14  1657 Jul 19 19:07 cuckoo.sh
+-rw-r--r--  1 eltex-v14 eltex-v14  2629 Jul 11 12:46 eltex-v14_part3_gt20M.log
+-rw-r--r--  1 eltex-v14 eltex-v14  9563 Jul 11 12:59 eltex-v14_part3.log
+-rw-r--r--  1 eltex-v14 eltex-v14  4488 Jul 10 05:27 eltex-v14_part.log
+-rw-r--r--  1 eltex-v14 eltex-v14 34765 Jul 13 15:33 go.log
+-rw-r--r--  1 eltex-v14 eltex-v14   882 Jul 13 15:42 grup.log
+-rw-r--r--  1 eltex-v14 eltex-v14 36981 Jul 15 12:36 history_format.log
+-rw-r--r--  1 eltex-v14 eltex-v14    69 Jul 10 11:27 .log
+-rw-r--r--  1 eltex-v14 eltex-v14    33 Jul 19 18:49 observer.conf
+-rwxr-xr-x  1 eltex-v14 eltex-v14  1781 Jul 19 19:07 observer.sh
+-rw-r--r--  1 eltex-v14 eltex-v14 10613 Jul 11 19:48 practice2_eltex-v14_part1.log
+-rw-r--r--  1 eltex-v14 eltex-v14  1194 Jul 13 14:13 practice2_eltex-v14_part2.log
+-rw-r--r--  1 eltex-v14 eltex-v14    30 Jul 13 07:56 practice2_eltex-v14_part3.log
+-rw-r--r--  1 eltex-v14 eltex-v14  2318 Jul 19 19:18 README.txt
+-rw-r--r--  1 eltex-v14 eltex-v14   130 Jul  6 13:35 report_part1.txt
+lrwxrwxrwx  1 eltex-v14 eltex-v14    16 Jul 19 19:11 task1.sh -> template_task.sh
+lrwxrwxrwx  1 eltex-v14 eltex-v14    16 Jul 19 19:11 task2.sh -> template_task.sh
+-rw-r--r--  1 eltex-v14 eltex-v14  2414 Jul 19 19:18 task3_part2.tar.gz
+lrwxrwxrwx  1 eltex-v14 eltex-v14    16 Jul 19 19:11 task3.sh -> template_task.sh
+-rwxr-xr-x  1 eltex-v14 eltex-v14  1510 Jul 19 19:07 template_task.sh
+
+
+
+echo "=== Проверка целостности архива ==="
+if tar -tzf task3_part2.tar.gz > /dev/null 2>&1; then
+    echo "✅ Архив цел и корректен"
+else
+    echo "❌ Архив поврежден"
+fi
+
+echo
+echo "=== Количество файлов в архиве ==="
+tar -tzf task3_part2.tar.gz | wc -l
+
+echo
+echo "=== Список всех файлов в архиве ==="
+tar -tzf task3_part2.tar.gz
+
+=== Проверка целостности архива ===
+✅ Архив цел и корректен
+
+=== Количество файлов в архиве ===
+12
+
+=== Список всех файлов в архиве ===
+cuckoo.log
+observer.log
+report_task1.log
+report_task2.log
+report_task3.log
+cuckoo.sh
+template_task.sh
+observer.sh
+observer.conf
+task1.sh
+task2.sh
+task3.sh
+
+
+
+cat > README.txt << 'EOF'
+Отчет по заданию "Модуль 1 Практика 3 (Раздел 2)"
+
+Дата выполнения: 2026-07-19
+Студент: eltex-v14
+
+Описание работы:
+
+1. cuckoo.sh - серверный скрипт:
+   - Создает именованный канал /tmp/run/cuckoo.pid
+   - При запуске записывает в cuckoo.log: "Startup!"
+   - Обрабатывает запросы вида "NAME[PID]: how much time do I have?"
+   - Отвечает случайным числом N от 2 до 10
+   - При получении SIGUSR1 записывает "Shutdown!" и завершается
+
+2. template_task.sh - шаблон задачи:
+   - Проверяет имя скрипта (если template_task.sh - выходит с сообщением "я бригадир, сам не работаю")
+   - Запрашивает время у cuckoo.sh через именованный канал
+   - Ждет N секунд
+   - Логирует запуск и завершение в report_*.log
+
+3. task1.sh, task2.sh, task3.sh - символьные ссылки на template_task.sh
+
+4. observer.sh - мониторинг:
+   - Читает observer.conf со списком задач
+   - Проверяет наличие процессов через /proc
+   - Запускает отсутствующие через nohup
+
+5. cron - запускает observer.sh каждую минуту
+
+Результаты работы:
+
+cuckoo.log:
+2026-07-19 19:12:48 Startup!
+2026-07-19 19:12:55 task1.sh[353348] 3
+2026-07-19 19:13:18 task1.sh[353512] 2
+2026-07-19 19:13:19 task2.sh[353528] 7
+2026-07-19 19:13:20 task3.sh[353545] 8
+2026-07-19 19:16:25 Shutdown!
+
+Все задачи успешно отработали:
+- task1.sh: работал 3 секунды (первый запуск) и 2 секунды (второй запуск)
+- task2.sh: работал 7 секунд
+- task3.sh: работал 8 секунд
+
+observer.log:
+2026-07-19 19:13:18 Запуск: /home/eltex-v14/./task1.sh
+2026-07-19 19:13:19 Запуск: /home/eltex-v14/./task2.sh
+2026-07-19 19:13:20 Запуск: /home/eltex-v14/./task3.sh
+
+Все задачи были успешно запущены observer.sh.
+
+Задание выполнено полностью.
+EOF
+
+tar -czf task3_part2_final.tar.gz \
+    cuckoo.log \
+    observer.log \
+    report_task1.log \
+    report_task2.log \
+    report_task3.log \
+    cuckoo.sh \
+    template_task.sh \
+    observer.sh \
+    observer.conf \
+    task1.sh \
+    task2.sh \
+    task3.sh \
+    README.txt
+
+mv task3_part2_final.tar.gz task3_eltex-v14_2026-07-19.tar.gz
+
+ls -lh task3_eltex-v14_2026-07-19.tar.gz
+-rw-r--r-- 1 eltex-v14 eltex-v14 3.0K Jul 19 19:20 task3_eltex-v14_2026-07-19.tar.gz
+
+tar -tzf task3_eltex-v14_2026-07-19.tar.gz
+cuckoo.log
+observer.log
+report_task1.log
+report_task2.log
+report_task3.log
+cuckoo.sh
+template_task.sh
+observer.sh
+observer.conf
+task1.sh
+task2.sh
+task3.sh
+README.txt
+
+EOF
+
+cat REPORT_SECTION2.txt
